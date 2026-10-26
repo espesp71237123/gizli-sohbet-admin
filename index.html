@@ -1,1 +1,160 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sohbet Admin Paneli</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen p-4 md:p-8 font-sans">
+
+    <div class="max-w-4xl mx-auto space-y-6">
+        
+        <!-- Üst Başlık -->
+        <header class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center justify-center text-emerald-400 text-2xl">
+                    <i class="fa-solid fa-user-shield"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-white">Yönetici Paneli</h1>
+                    <p class="text-xs text-slate-400">Canlı Sistem İstatistikleri ve Veritabanı Yönetimi</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span class="text-xs text-emerald-400 font-mono">Veritabanı Bağlandı</span>
+            </div>
+        </header>
+
+        <!-- CANLI İSTATİSTİK KARTLARI -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-400 font-medium">Toplam Kayıtlı Kullanıcı</p>
+                    <h3 id="stat-total-users" class="text-2xl font-bold text-white mt-1">0</h3>
+                </div>
+                <div class="text-slate-600 text-2xl"><i class="fa-solid fa-users"></i></div>
+            </div>
+
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-400 font-medium">Anlık Çevrim İçi</p>
+                    <h3 id="stat-online-users" class="text-2xl font-bold text-emerald-400 mt-1">0</h3>
+                </div>
+                <div class="text-emerald-500/30 text-2xl"><i class="fa-solid fa-signal"></i></div>
+            </div>
+
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-400 font-medium">Aktif Sohbet Odası</p>
+                    <h3 id="stat-total-chats" class="text-2xl font-bold text-white mt-1">0</h3>
+                </div>
+                <div class="text-slate-600 text-2xl"><i class="fa-solid fa-comments"></i></div>
+            </div>
+
+        </div>
+
+        <!-- DUYURU GÖNDERME KUTUSU -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+            <div class="flex items-center gap-2 border-b border-slate-800 pb-3">
+                <i class="fa-solid fa-bullhorn text-emerald-400"></i>
+                <h2 class="text-sm font-bold text-white">Sistem Duyurusu Yayınla</h2>
+            </div>
+            <p class="text-xs text-slate-400">Göndereceğin mesaj, uygulamada aktif olan tüm kullanıcıların ekranına anlık düşecektir.</p>
+            
+            <textarea id="announcement-input" placeholder="Duyuru metnini yazın..." rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500 placeholder-slate-600 resize-none"></textarea>
+            
+            <button onclick="sendAnnouncement()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-5 py-2.5 rounded-xl text-xs transition shadow-lg shadow-emerald-950 flex items-center justify-center gap-2">
+                <i class="fa-solid fa-paper-plane"></i> Duyuruyu Gönder
+            </button>
+        </div>
+
+        <!-- VERİTABANI VE MEDYA TEMİZLEME -->
+        <div class="bg-slate-900 border border-rose-900/30 rounded-2xl p-6 shadow-xl space-y-4">
+            <div class="flex items-center gap-2 border-b border-slate-800 pb-3">
+                <i class="fa-solid fa-triangle-exclamation text-rose-500"></i>
+                <h2 class="text-sm font-bold text-rose-400">Veritabanı & İçerik Temizliği</h2>
+            </div>
+            <p class="text-xs text-slate-400">Tek bir tıklamayla veritabanında birikmiş olan bütün sohbet geçmişini ve gönderilen fotoğrafları/videoları silebilirsin.</p>
+            
+            <button onclick="clearAllChats()" class="bg-rose-600 hover:bg-rose-500 text-white font-semibold px-5 py-2.5 rounded-xl text-xs transition shadow-lg shadow-rose-950 flex items-center justify-center gap-2">
+                <i class="fa-solid fa-trash-can"></i> Tüm Sohbet İçeriklerini ve Medyaları Sil
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyAaL84KaXZ4k3yCVNlq9cAgMTdR3CBvn14",
+            authDomain: "gizli-sohbet-62a78.firebaseapp.com",
+            databaseURL: "https://gizli-sohbet-62a78-default-rtdb.firebaseio.com",
+            projectId: "gizli-sohbet-62a78",
+            storageBucket: "gizli-sohbet-62a78.firebasestorage.app",
+            messagingSenderId: "911198049657",
+            appId: "1:911198049657:web:9873ecd9a6b35dbb0dcba8"
+        };
+        
+        try { firebase.initializeApp(firebaseConfig); } catch(e) {}
+        const db = firebase.database();
+
+        function initAdminStats() {
+            db.ref('status').on('value', (snapshot) => {
+                const statuses = snapshot.val() || {};
+                const totalUsers = Object.keys(statuses).length;
+                let onlineCount = 0;
+
+                Object.values(statuses).forEach(user => {
+                    if (user.state === 'online') onlineCount++;
+                });
+
+                document.getElementById('stat-total-users').innerText = totalUsers;
+                document.getElementById('stat-online-users').innerText = onlineCount;
+            });
+
+            db.ref('chats').on('value', (snapshot) => {
+                const chats = snapshot.val() || {};
+                document.getElementById('stat-total-chats').innerText = Object.keys(chats).length;
+            });
+        }
+
+        function sendAnnouncement() {
+            const input = document.getElementById('announcement-input');
+            const text = input.value.trim();
+            if (!text) return alert("Lütfen bir duyuru metni girin!");
+
+            db.ref('system_announcement').set({
+                text: text,
+                timestamp: Date.now()
+            }).then(() => {
+                alert("Duyuru yayınlandı!");
+                input.value = '';
+            }).catch(err => {
+                alert("Hata oluştu: " + err.message);
+            });
+        }
+
+        function clearAllChats() {
+            if (confirm("DİKKAT! Tüm sohbet geçmişi, fotoğraflar ve videolar veritabanından kalıcı olarak silinecek. Emin misin?")) {
+                db.ref('chats').remove()
+                    .then(() => {
+                        alert("Bütün mesajlar ve medyalar başarıyla temizlendi!");
+                    })
+                    .catch((err) => {
+                        alert("Hata oluştu: " + err.message);
+                    });
+            }
+        }
+
+        window.onload = initAdminStats;
+    </script>
+</body>
+</html>
 
