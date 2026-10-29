@@ -74,7 +74,7 @@
             <div class="flex items-center justify-between border-b border-slate-800 pb-3">
                 <div class="flex items-center gap-2">
                     <i class="fa-solid fa-address-book text-emerald-400"></i>
-                    <h2 class="text-sm font-bold text-white">Sisteme Kayıtlı Tüm Kullanıcılar</h2>
+                    <h2 class="text-sm font-bold text-white">Sistemdeki Kullanıcılar (Status Kayıtları)</h2>
                 </div>
                 <span id="user-count-badge" class="text-[10px] bg-slate-800 text-slate-300 px-2.5 py-1 rounded-full font-mono">0 Kişi</span>
             </div>
@@ -142,7 +142,7 @@
         const db = firebase.database();
 
         function initAdminStats() {
-            // Veritabanı Boyutu ve Doluluk Çubuğu (Max 100 MB baz alındı)
+            // Veritabanı Boyutu ve Doluluk Çubuğu
             db.ref('/').on('value', (snapshot) => {
                 const fullData = snapshot.val() || {};
                 const jsonString = JSON.stringify(fullData);
@@ -167,72 +167,53 @@
                 document.getElementById('stat-total-chats').innerText = Object.keys(chats).length;
             });
 
-            // Tüm Kayıtlı Kullanıcılar ve Canlı Durumları
-            db.ref('users').on('value', (userSnapshot) => {
-                const allUsers = userSnapshot.val() || {};
-                
-                db.ref('status').once('value', (statusSnapshot) => {
-                    const statuses = statusSnapshot.val() || {};
-                    renderUsersTable(allUsers, statuses);
+            // Status tablosundan tüm kullanıcıları çek (Eski 6 kişi direkt buradaydı)
+            db.ref('status').on('value', (snapshot) => {
+                const statuses = snapshot.val() || {};
+                const tbody = document.getElementById('users-table-body');
+                tbody.innerHTML = '';
+
+                const userKeys = Object.keys(statuses);
+                const totalUsers = userKeys.length;
+                let onlineCount = 0;
+
+                document.getElementById('user-count-badge').innerText = totalUsers + ' Kişi';
+                document.getElementById('stat-total-users').innerText = totalUsers;
+
+                if (totalUsers === 0) {
+                    tbody.innerHTML = `<tr><td colspan="3" class="text-center py-6 text-slate-500">Henüz kayıtlı kullanıcı yok.</td></tr>`;
+                    document.getElementById('stat-online-users').innerText = 0;
+                    return;
+                }
+
+                Object.entries(statuses).forEach(([id, user]) => {
+                    const isOnline = user.state === 'online';
+                    if (isOnline) onlineCount++;
+
+                    const userName = user.name || 'İsimsiz';
+
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-950/50 transition";
+                    tr.innerHTML = `
+                        <td class="p-3 font-semibold text-white flex items-center gap-2">
+                            <div class="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-emerald-400 text-xs shrink-0">
+                                ${userName.charAt(0).toUpperCase()}
+                            </div>
+                            <span class="truncate max-w-[120px] sm:max-w-none">${userName}</span>
+                        </td>
+                        <td class="p-3 font-mono text-slate-400 truncate max-w-[100px] sm:max-w-none">${id}</td>
+                        <td class="p-3">
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium ${isOnline ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-slate-800 text-slate-400'}">
+                                <span class="w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500'}"></span>
+                                ${isOnline ? 'Çevrim İçi' : 'Çevrim Dışı'}
+                            </span>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
                 });
+
+                document.getElementById('stat-online-users').innerText = onlineCount;
             });
-
-            // Status anlık değişimlerini de dinle ki biri çevrim içi olduğunda tablo direkt güncellensin
-            db.ref('status').on('value', (statusSnapshot) => {
-                const statuses = statusSnapshot.val() || {};
-                db.ref('users').once('value', (userSnapshot) => {
-                    const allUsers = userSnapshot.val() || {};
-                    renderUsersTable(allUsers, statuses);
-                });
-            });
-        }
-
-        function renderUsersTable(allUsers, statuses) {
-            const tbody = document.getElementById('users-table-body');
-            tbody.innerHTML = '';
-
-            const userIds = Object.keys(allUsers);
-            const totalUsers = userIds.length;
-            let onlineCount = 0;
-
-            document.getElementById('user-count-badge').innerText = totalUsers + ' Kişi';
-            document.getElementById('stat-total-users').innerText = totalUsers;
-
-            if (totalUsers === 0) {
-                tbody.innerHTML = `<tr><td colspan="3" class="text-center py-6 text-slate-500">Henüz kayıtlı kullanıcı yok.</td></tr>`;
-                document.getElementById('stat-online-users').innerText = 0;
-                return;
-            }
-
-            userIds.forEach(id => {
-                const user = allUsers[id];
-                const statusInfo = statuses[id];
-                const isOnline = statusInfo && statusInfo.state === 'online';
-                if (isOnline) onlineCount++;
-
-                const userName = user.name || 'İsimsiz';
-
-                const tr = document.createElement('tr');
-                tr.className = "hover:bg-slate-950/50 transition";
-                tr.innerHTML = `
-                    <td class="p-3 font-semibold text-white flex items-center gap-2">
-                        <div class="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-emerald-400 text-xs shrink-0">
-                            ${userName.charAt(0).toUpperCase()}
-                        </div>
-                        <span class="truncate max-w-[120px] sm:max-w-none">${userName}</span>
-                    </td>
-                    <td class="p-3 font-mono text-slate-400 truncate max-w-[100px] sm:max-w-none">${id}</td>
-                    <td class="p-3">
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium ${isOnline ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-slate-800 text-slate-400'}">
-                            <span class="w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500'}"></span>
-                            ${isOnline ? 'Çevrim İçi' : 'Çevrim Dışı'}
-                        </span>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-
-            document.getElementById('stat-online-users').innerText = onlineCount;
         }
 
         function sendAnnouncement() {
