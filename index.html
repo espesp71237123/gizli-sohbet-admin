@@ -74,7 +74,7 @@
             <div class="flex items-center justify-between border-b border-slate-800 pb-3">
                 <div class="flex items-center gap-2">
                     <i class="fa-solid fa-address-book text-emerald-400"></i>
-                    <h2 class="text-sm font-bold text-white">Sistemdeki Kullanıcılar (Status Kayıtları)</h2>
+                    <h2 class="text-sm font-bold text-white">Sistemdeki Kullanıcılar</h2>
                 </div>
                 <span id="user-count-badge" class="text-[10px] bg-slate-800 text-slate-300 px-2.5 py-1 rounded-full font-mono">0 Kişi</span>
             </div>
@@ -153,7 +153,7 @@
 
                 let sizeStr = bytes + " B";
                 if (bytes > 1024 * 1024) {
-                    sizeStr = (bytes / (1024 * 1024)).toFixed(2) + " MB";
+                    sizeStr = (bytes / (1024 * 1024)).2 + " MB";
                 } else if (bytes > 1024) {
                     sizeStr = (bytes / 1024).toFixed(2) + " KB";
                 }
@@ -167,13 +167,45 @@
                 document.getElementById('stat-total-chats').innerText = Object.keys(chats).length;
             });
 
-            // Status tablosundan tüm kullanıcıları çek (Eski 6 kişi direkt buradaydı)
-            db.ref('status').on('value', (snapshot) => {
-                const statuses = snapshot.val() || {};
+            // Kullanıcıları ve İsimleri Akıllı Çekme Mekanizması
+            db.ref('/').on('value', (snapshot) => {
+                const rootData = snapshot.val() || {};
+                const statuses = rootData.status || {};
+                const requests = rootData.requests || {};
+                const accepted = rootData.accepted || {};
+
+                // İsimleri saklamak için bir havuz oluşturalım
+                let userNames = {};
+
+                // 1. Önce status içindeki isimleri al
+                Object.entries(statuses).forEach(([id, val]) => {
+                    if (val && val.name) userNames[id] = val.name;
+                });
+
+                // 2. Status'te ismi olmayanlar için requests (istekler) tablosundan isim yakala
+                Object.entries(requests).forEach(([targetId, senders]) => {
+                    if (typeof senders === 'object') {
+                        Object.entries(senders).forEach(([senderId, reqData]) => {
+                            if (reqData && reqData.fromName) {
+                                userNames[reqData.fromId || senderId] = reqData.fromName;
+                            }
+                        });
+                    }
+                });
+
+                // 3. accepted tablosundan isim yakala
+                Object.entries(accepted).forEach(([id, val]) => {
+                    if (val && val.name) userNames[val.id] = val.name;
+                });
+
+                // Tüm kullanıcı ID'lerini birleştirelim (Status + İstek atanlar)
+                let allUserIds = new Set([...Object.keys(statuses)]);
+                Object.keys(requests).forEach(id => allUserIds.add(id));
+
                 const tbody = document.getElementById('users-table-body');
                 tbody.innerHTML = '';
 
-                const userKeys = Object.keys(statuses);
+                const userKeys = Array.from(allUserIds);
                 const totalUsers = userKeys.length;
                 let onlineCount = 0;
 
@@ -186,11 +218,13 @@
                     return;
                 }
 
-                Object.entries(statuses).forEach(([id, user]) => {
-                    const isOnline = user.state === 'online';
+                userKeys.forEach(id => {
+                    const statusInfo = statuses[id];
+                    const isOnline = statusInfo && statusInfo.state === 'online';
                     if (isOnline) onlineCount++;
 
-                    const userName = user.name || 'İsimsiz';
+                    // İsmi bulamazsa ID'nin başını kullansın ama artık "İsimsiz" yazmasın
+                    const userName = userNames[id] || (statusInfo && statusInfo.name) || ('Kullanıcı_' + id.substring(0, 5));
 
                     const tr = document.createElement('tr');
                     tr.className = "hover:bg-slate-950/50 transition";
