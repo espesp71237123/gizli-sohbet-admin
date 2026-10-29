@@ -33,32 +33,68 @@
         </header>
 
         <!-- CANLI İSTATİSTİK KARTLARI -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex items-center justify-between">
                 <div>
-                    <p class="text-xs text-slate-400 font-medium">Toplam Kayıtlı Kullanıcı</p>
-                    <h3 id="stat-total-users" class="text-2xl font-bold text-white mt-1">0</h3>
+                    <p class="text-xs text-slate-400 font-medium">Toplam Kullanıcı</p>
+                    <h3 id="stat-total-users" class="text-xl font-bold text-white mt-1">0</h3>
                 </div>
-                <div class="text-slate-600 text-2xl"><i class="fa-solid fa-users"></i></div>
+                <div class="text-slate-600 text-xl"><i class="fa-solid fa-users"></i></div>
             </div>
 
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex items-center justify-between">
                 <div>
                     <p class="text-xs text-slate-400 font-medium">Anlık Çevrim İçi</p>
-                    <h3 id="stat-online-users" class="text-2xl font-bold text-emerald-400 mt-1">0</h3>
+                    <h3 id="stat-online-users" class="text-xl font-bold text-emerald-400 mt-1">0</h3>
                 </div>
-                <div class="text-emerald-500/30 text-2xl"><i class="fa-solid fa-signal"></i></div>
+                <div class="text-emerald-500/30 text-xl"><i class="fa-solid fa-signal"></i></div>
             </div>
 
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex items-center justify-between">
                 <div>
                     <p class="text-xs text-slate-400 font-medium">Aktif Sohbet Odası</p>
-                    <h3 id="stat-total-chats" class="text-2xl font-bold text-white mt-1">0</h3>
+                    <h3 id="stat-total-chats" class="text-xl font-bold text-white mt-1">0</h3>
                 </div>
-                <div class="text-slate-600 text-2xl"><i class="fa-solid fa-comments"></i></div>
+                <div class="text-slate-600 text-xl"><i class="fa-solid fa-comments"></i></div>
             </div>
 
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-400 font-medium">Veritabanı Boyutu</p>
+                    <h3 id="stat-db-size" class="text-xl font-bold text-amber-400 mt-1">0 KB</h3>
+                </div>
+                <div class="text-amber-500/30 text-xl"><i class="fa-solid fa-database"></i></div>
+            </div>
+
+        </div>
+
+        <!-- KULLANICILAR LİSTESİ BÖLÜMÜ -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-address-book text-emerald-400"></i>
+                    <h2 class="text-sm font-bold text-white">Sisteme Kayıtlı / Yeni Gelen Kullanıcılar</h2>
+                </div>
+                <span id="user-count-badge" class="text-[10px] bg-slate-800 text-slate-300 px-2.5 py-1 rounded-full font-mono">0 Kişi</span>
+            </div>
+            
+            <div class="overflow-x-auto max-h-72 overflow-y-auto">
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-950 text-slate-400 uppercase font-mono text-[10px] sticky top-0">
+                        <tr>
+                            <th class="p-3 rounded-l-xl">Kullanıcı Adı</th>
+                            <th class="p-3">Özel ID</th>
+                            <th class="p-3 rounded-r-xl">Durum</th>
+                        </tr>
+                    </thead>
+                    <tbody id="users-table-body" class="divide-y divide-slate-800/50">
+                        <tr>
+                            <td colspan="3" class="text-center py-6 text-slate-500">Kullanıcılar yükleniyor...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <!-- DUYURU GÖNDERME KUTUSU -->
@@ -106,22 +142,69 @@
         const db = firebase.database();
 
         function initAdminStats() {
-            db.ref('status').on('value', (snapshot) => {
-                const statuses = snapshot.val() || {};
-                const totalUsers = Object.keys(statuses).length;
-                let onlineCount = 0;
+            // Veritabanı Boyutu ve Durum Takibi
+            db.ref('/').on('value', (snapshot) => {
+                const fullData = snapshot.val() || {};
+                const jsonString = JSON.stringify(fullData);
+                const bytes = new Blob([jsonString]).size;
+                
+                let sizeStr = bytes + " B";
+                if (bytes > 1024 * 1024) {
+                    sizeStr = (bytes / (1024 * 1024)).toFixed(2) + " MB";
+                } else if (bytes > 1024) {
+                    sizeStr = (bytes / 1024).toFixed(2) + " KB";
+                }
+                document.getElementById('stat-db-size').innerText = sizeStr;
 
-                Object.values(statuses).forEach(user => {
-                    if (user.state === 'online') onlineCount++;
-                });
-
-                document.getElementById('stat-total-users').innerText = totalUsers;
-                document.getElementById('stat-online-users').innerText = onlineCount;
+                // Sohbet Odası Sayısı
+                const chats = fullData.chats || {};
+                document.getElementById('stat-total-chats').innerText = Object.keys(chats).length;
             });
 
-            db.ref('chats').on('value', (snapshot) => {
-                const chats = snapshot.val() || {};
-                document.getElementById('stat-total-chats').innerText = Object.keys(chats).length;
+            // Kullanıcılar ve Durumları
+            db.ref('status').on('value', (snapshot) => {
+                const statuses = snapshot.val() || {};
+                const userKeys = Object.keys(statuses);
+                const totalUsers = userKeys.length;
+                let onlineCount = 0;
+
+                const tbody = document.getElementById('users-table-body');
+                tbody.innerHTML = '';
+
+                document.getElementById('user-count-badge').innerText = totalUsers + ' Kişi';
+                document.getElementById('stat-total-users').innerText = totalUsers;
+
+                if (totalUsers === 0) {
+                    tbody.innerHTML = `<tr><td colspan="3" class="text-center py-6 text-slate-500">Henüz kayıtlı kullanıcı yok.</td></tr>`;
+                    document.getElementById('stat-online-users').innerText = 0;
+                    return;
+                }
+
+                Object.entries(statuses).forEach(([id, user]) => {
+                    const isOnline = user.state === 'online';
+                    if (isOnline) onlineCount++;
+
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-950/50 transition";
+                    tr.innerHTML = `
+                        <td class="p-3 font-semibold text-white flex items-center gap-2">
+                            <div class="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-emerald-400 text-xs shrink-0">
+                                ${(user.name || 'İ').charAt(0).toUpperCase()}
+                            </div>
+                            <span class="truncate max-w-[120px] sm:max-w-none">${user.name || 'İsimsiz'}</span>
+                        </td>
+                        <td class="p-3 font-mono text-slate-400 truncate max-w-[100px] sm:max-w-none">${id}</td>
+                        <td class="p-3">
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium ${isOnline ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-slate-800 text-slate-400'}">
+                                <span class="w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500'}"></span>
+                                ${isOnline ? 'Çevrim İçi' : 'Çevrim Dışı'}
+                            </span>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                document.getElementById('stat-online-users').innerText = onlineCount;
             });
         }
 
@@ -157,4 +240,3 @@
     </script>
 </body>
 </html>
-
