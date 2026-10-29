@@ -33,22 +33,14 @@
         </header>
 
         <!-- CANLI İSTATİSTİK KARTLARI -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex items-center justify-between">
                 <div>
-                    <p class="text-xs text-slate-400 font-medium">Toplam Kullanıcı</p>
-                    <h3 id="stat-total-users" class="text-xl font-bold text-white mt-1">0</h3>
+                    <p class="text-xs text-slate-400 font-medium">Toplam / Çevrim İçi Kullanıcı</p>
+                    <h3 class="text-xl font-bold text-white mt-1"><span id="stat-total-users">0</span> <span class="text-xs text-emerald-400 font-normal">(<span id="stat-online-users">0</span> aktif)</span></h3>
                 </div>
                 <div class="text-slate-600 text-xl"><i class="fa-solid fa-users"></i></div>
-            </div>
-
-            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex items-center justify-between">
-                <div>
-                    <p class="text-xs text-slate-400 font-medium">Anlık Çevrim İçi</p>
-                    <h3 id="stat-online-users" class="text-xl font-bold text-emerald-400 mt-1">0</h3>
-                </div>
-                <div class="text-emerald-500/30 text-xl"><i class="fa-solid fa-signal"></i></div>
             </div>
 
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex items-center justify-between">
@@ -59,12 +51,20 @@
                 <div class="text-slate-600 text-xl"><i class="fa-solid fa-comments"></i></div>
             </div>
 
-            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex items-center justify-between">
-                <div>
-                    <p class="text-xs text-slate-400 font-medium">Veritabanı Boyutu</p>
-                    <h3 id="stat-db-size" class="text-xl font-bold text-amber-400 mt-1">0 KB</h3>
+            <!-- VERİTABANI DOLULUK KARTI & ÇUBUĞU -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-2 col-span-1 sm:col-span-2 md:col-span-1">
+                <div class="flex items-center justify-between">
+                    <p class="text-xs text-slate-400 font-medium">Veritabanı Doluluğu</p>
+                    <span id="stat-db-size-text" class="text-xs font-mono text-amber-400 font-bold">0 KB / 100 MB</span>
                 </div>
-                <div class="text-amber-500/30 text-xl"><i class="fa-solid fa-database"></i></div>
+                <!-- Doluluk Çubuğu -->
+                <div class="w-full bg-slate-950 rounded-full h-2.5 overflow-hidden border border-slate-800">
+                    <div id="db-progress-bar" class="bg-amber-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+                <div class="flex justify-between text-[9px] text-slate-500 font-mono">
+                    <span id="db-percentage">%0.0 Dolu</span>
+                    <span>Max: 100 MB</span>
+                </div>
             </div>
 
         </div>
@@ -74,7 +74,7 @@
             <div class="flex items-center justify-between border-b border-slate-800 pb-3">
                 <div class="flex items-center gap-2">
                     <i class="fa-solid fa-address-book text-emerald-400"></i>
-                    <h2 class="text-sm font-bold text-white">Sisteme Kayıtlı / Yeni Gelen Kullanıcılar</h2>
+                    <h2 class="text-sm font-bold text-white">Sisteme Kayıtlı Tüm Kullanıcılar</h2>
                 </div>
                 <span id="user-count-badge" class="text-[10px] bg-slate-800 text-slate-300 px-2.5 py-1 rounded-full font-mono">0 Kişi</span>
             </div>
@@ -85,7 +85,7 @@
                         <tr>
                             <th class="p-3 rounded-l-xl">Kullanıcı Adı</th>
                             <th class="p-3">Özel ID</th>
-                            <th class="p-3 rounded-r-xl">Durum</th>
+                            <th class="p-3 rounded-r-xl">Anlık Durum</th>
                         </tr>
                     </thead>
                     <tbody id="users-table-body" class="divide-y divide-slate-800/50">
@@ -142,70 +142,97 @@
         const db = firebase.database();
 
         function initAdminStats() {
-            // Veritabanı Boyutu ve Durum Takibi
+            // Veritabanı Boyutu ve Doluluk Çubuğu (Max 100 MB baz alındı)
             db.ref('/').on('value', (snapshot) => {
                 const fullData = snapshot.val() || {};
                 const jsonString = JSON.stringify(fullData);
                 const bytes = new Blob([jsonString]).size;
                 
+                const maxBytes = 100 * 1024 * 1024; // 100 MB sınır
+                const percentage = Math.min((bytes / maxBytes) * 100, 100);
+
                 let sizeStr = bytes + " B";
                 if (bytes > 1024 * 1024) {
                     sizeStr = (bytes / (1024 * 1024)).toFixed(2) + " MB";
                 } else if (bytes > 1024) {
                     sizeStr = (bytes / 1024).toFixed(2) + " KB";
                 }
-                document.getElementById('stat-db-size').innerText = sizeStr;
+
+                document.getElementById('stat-db-size-text').innerText = `${sizeStr} / 100 MB`;
+                document.getElementById('db-progress-bar').style.width = percentage.toFixed(1) + '%';
+                document.getElementById('db-percentage').innerText = `%${percentage.toFixed(2)} Dolu`;
 
                 // Sohbet Odası Sayısı
                 const chats = fullData.chats || {};
                 document.getElementById('stat-total-chats').innerText = Object.keys(chats).length;
             });
 
-            // Kullanıcılar ve Durumları
-            db.ref('status').on('value', (snapshot) => {
-                const statuses = snapshot.val() || {};
-                const userKeys = Object.keys(statuses);
-                const totalUsers = userKeys.length;
-                let onlineCount = 0;
-
-                const tbody = document.getElementById('users-table-body');
-                tbody.innerHTML = '';
-
-                document.getElementById('user-count-badge').innerText = totalUsers + ' Kişi';
-                document.getElementById('stat-total-users').innerText = totalUsers;
-
-                if (totalUsers === 0) {
-                    tbody.innerHTML = `<tr><td colspan="3" class="text-center py-6 text-slate-500">Henüz kayıtlı kullanıcı yok.</td></tr>`;
-                    document.getElementById('stat-online-users').innerText = 0;
-                    return;
-                }
-
-                Object.entries(statuses).forEach(([id, user]) => {
-                    const isOnline = user.state === 'online';
-                    if (isOnline) onlineCount++;
-
-                    const tr = document.createElement('tr');
-                    tr.className = "hover:bg-slate-950/50 transition";
-                    tr.innerHTML = `
-                        <td class="p-3 font-semibold text-white flex items-center gap-2">
-                            <div class="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-emerald-400 text-xs shrink-0">
-                                ${(user.name || 'İ').charAt(0).toUpperCase()}
-                            </div>
-                            <span class="truncate max-w-[120px] sm:max-w-none">${user.name || 'İsimsiz'}</span>
-                        </td>
-                        <td class="p-3 font-mono text-slate-400 truncate max-w-[100px] sm:max-w-none">${id}</td>
-                        <td class="p-3">
-                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium ${isOnline ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-slate-800 text-slate-400'}">
-                                <span class="w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500'}"></span>
-                                ${isOnline ? 'Çevrim İçi' : 'Çevrim Dışı'}
-                            </span>
-                        </td>
-                    `;
-                    tbody.appendChild(tr);
+            // Tüm Kayıtlı Kullanıcılar ve Canlı Durumları
+            db.ref('users').on('value', (userSnapshot) => {
+                const allUsers = userSnapshot.val() || {};
+                
+                db.ref('status').once('value', (statusSnapshot) => {
+                    const statuses = statusSnapshot.val() || {};
+                    renderUsersTable(allUsers, statuses);
                 });
-
-                document.getElementById('stat-online-users').innerText = onlineCount;
             });
+
+            // Status anlık değişimlerini de dinle ki biri çevrim içi olduğunda tablo direkt güncellensin
+            db.ref('status').on('value', (statusSnapshot) => {
+                const statuses = statusSnapshot.val() || {};
+                db.ref('users').once('value', (userSnapshot) => {
+                    const allUsers = userSnapshot.val() || {};
+                    renderUsersTable(allUsers, statuses);
+                });
+            });
+        }
+
+        function renderUsersTable(allUsers, statuses) {
+            const tbody = document.getElementById('users-table-body');
+            tbody.innerHTML = '';
+
+            const userIds = Object.keys(allUsers);
+            const totalUsers = userIds.length;
+            let onlineCount = 0;
+
+            document.getElementById('user-count-badge').innerText = totalUsers + ' Kişi';
+            document.getElementById('stat-total-users').innerText = totalUsers;
+
+            if (totalUsers === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="text-center py-6 text-slate-500">Henüz kayıtlı kullanıcı yok.</td></tr>`;
+                document.getElementById('stat-online-users').innerText = 0;
+                return;
+            }
+
+            userIds.forEach(id => {
+                const user = allUsers[id];
+                const statusInfo = statuses[id];
+                const isOnline = statusInfo && statusInfo.state === 'online';
+                if (isOnline) onlineCount++;
+
+                const userName = user.name || 'İsimsiz';
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-950/50 transition";
+                tr.innerHTML = `
+                    <td class="p-3 font-semibold text-white flex items-center gap-2">
+                        <div class="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-emerald-400 text-xs shrink-0">
+                            ${userName.charAt(0).toUpperCase()}
+                        </div>
+                        <span class="truncate max-w-[120px] sm:max-w-none">${userName}</span>
+                    </td>
+                    <td class="p-3 font-mono text-slate-400 truncate max-w-[100px] sm:max-w-none">${id}</td>
+                    <td class="p-3">
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium ${isOnline ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-slate-800 text-slate-400'}">
+                            <span class="w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500'}"></span>
+                            ${isOnline ? 'Çevrim İçi' : 'Çevrim Dışı'}
+                        </span>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('stat-online-users').innerText = onlineCount;
         }
 
         function sendAnnouncement() {
